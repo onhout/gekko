@@ -7,7 +7,7 @@ var config = {};
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 config.silent = false;
-config.debug = true;
+config.debug = false;
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //                       CONFIGURING TRADING ADVICE
@@ -21,7 +21,7 @@ config.tradingAdvisor = {
 }
 
 config.candleWriter = {
-  enabled: false
+  enabled: true
 }
 config.adviceWriter = {
   enabled: false,
@@ -85,7 +85,7 @@ config.backtest = {
 config.importer = {
   daterange: {
     // NOTE: these dates are in UTC
-    from: "2016-06-01 12:00:00"
+    from: "2017-09-01 00:00:00"
   }
 }
 
