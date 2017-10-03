@@ -6,9 +6,21 @@ const p = new Pushover({
   token: 'aufx54z8fxrkchnkqgj2whv1sed7if',
 });
 
+let array_index = 0;
+let best_number = [];
+let loopArr = [['low', 10, 35], ['high', 65, 90], ['interval', 7, 21]];
+let unchanged = {
+  candleSize: 5,
+  historySize: 10,
+};
+let firstArrName = loopArr[0][0];
+let secondArrName = loopArr[1][0];
+let thirdArrName = loopArr[2][0];
+
+
 function callBacktestApi(strategiConfig, callback) {
-  var body = JSON.stringify(strategiConfig);
-  var options = {
+  let body = JSON.stringify(strategiConfig);
+  let options = {
     host: '192.168.50.39',
     port: 3000,
     path: '/api/backtest',
@@ -27,8 +39,8 @@ function callBacktestApi(strategiConfig, callback) {
   postRequest.end();
 }
 
-function createRSIStragegy(params) {
-  return {
+function createStragegy(params) {
+  let obj = {
     gekkoConfig: {
       watch: {
         exchange: params.exchange || 'poloniex',
@@ -54,21 +66,13 @@ function createRSIStragegy(params) {
       },
       backtest: {
         daterange: {
-          from: params.fromDate || '2017-09-22T00:00:00Z',
-          to: params.toDate || '2017-09-28T00:00:00Z',
+          from: params.fromDate || '2017-09-25T00:00:00Z',
+          to: params.toDate || '2017-10-01T00:00:00Z',
         },
         batchSize: 50
       },
       valid: true,
 
-      'RSI': {
-        /*RSI*/interval: params.interval,
-        thresholds: {
-          /*RSI*/low: params.low,
-          /*RSI*/high: params.high,
-          /*RSI*/persistence: params.persistence
-        }
-      },
       'tradingAdvisor': {
         enabled: true,
         method: 'RSI',
@@ -90,34 +94,41 @@ function createRSIStragegy(params) {
       roundtrips: true,
       trades: true
     }
-  }
+  };
+
+  obj.gekkoConfig['RSI'] = {
+    /*RSI*/interval: params.interval,
+    thresholds: {
+      /*RSI*/low: params.low,
+      /*RSI*/high: params.high,
+      // How many candle intervals should a trend persist
+      // before we consider it real?
+      /*RSI*/persistence: 2
+    }
+  };
+  obj.algoInfo = {};
+  obj['algoInfo'][firstArrName] = params[firstArrName];
+  obj['algoInfo'][secondArrName] = params[secondArrName];
+  obj['algoInfo'][thirdArrName] = params[thirdArrName];
+
+  return obj;
 }
 
-let array_index = 0;
-let best_number = [];
-let firstStat = ['interval', 7, 12];
-let secondStat = ['low', 25, 35];
-let thirdStat = ['high', 65, 75];
-let unchanged = {
-  persistence: 1,
-  candleSize: 4,
-  historySize: 10,
-}
-
-function returnArr(unchanged) {
+function returnArr(unchanged, loopArr) {
   let arr = [];
-  for (let first = firstStat[1]; first <= firstStat[2]; first++) {
-    for (let second = secondStat[1]; second <= secondStat[2]; second++) {
-      for (let third = thirdStat[1]; third <= thirdStat[2]; third++) {
+  for (let first = loopArr[0][1]; first <= loopArr[0][2]; first++) {
+    for (let second = loopArr[1][1]; second <= loopArr[1][2]; second++) {
+      for (let third = loopArr[2][1]; third <= loopArr[2][2]; third++) {
         let dat = unchanged;
-        dat[firstStat[0]] = first;
-        dat[secondStat[0]] = second;
-        dat[thirdStat[0]] = third;
+        dat[firstArrName] = first;
+        dat[secondArrName] = second;
+        dat[thirdArrName] = third;
 
-        arr.push(createRSIStragegy(dat));
+        arr.push(createStragegy(dat));
       }
     }
   }
+
   return arr;
 }
 
@@ -128,20 +139,25 @@ function runningFunc(array_list, int) {
     fs.appendFileSync('testresult.txt', `TEST#${array_index + 1}
     CandleSize: ${array_list[array_index].gekkoConfig.tradingAdvisor.candleSize}
     HistorySize: ${array_list[array_index].gekkoConfig.tradingAdvisor.historySize}
-    Interval: ${array_list[array_index].gekkoConfig.RSI.interval}
-    Low: ${array_list[array_index].gekkoConfig.RSI.thresholds.low} 
-    High: ${array_list[array_index].gekkoConfig.RSI.thresholds.high} 
-    Persistence: ${array_list[array_index].gekkoConfig.RSI.thresholds.persistence}\n`);
+    ${firstArrName}: ${array_list[array_index]['algoInfo'][firstArrName]} 
+    ${secondArrName}: ${array_list[array_index]['algoInfo'][secondArrName]}
+    ${thirdArrName}: ${array_list[array_index]['algoInfo'][thirdArrName]}\n`);
 
     callBacktestApi(array_list[array_index],
       (result) => {
         fs.appendFileSync('testresult.txt', `Trades: ${result.trades.length} | Market: ${result.report.market.toFixed(2)}% | Bot: ${result.report.relativeProfit.toFixed(2)}% | Balance: ${result.report.balance} \n\n`);
-        best_number.push({
-          'test_num': array_index,
+        let numbers = {
+          'test_num': array_index + 1,
           'trades': result.trades.length,
           'market': result.report.market,
-          'gain': result.report.relativeProfit
-        });
+          'gain': result.report.relativeProfit,
+        };
+        numbers[firstArrName] = array_list[array_index]['algoInfo'][firstArrName];
+        numbers[secondArrName] = array_list[array_index]['algoInfo'][secondArrName];
+        numbers[thirdArrName] = array_list[array_index]['algoInfo'][thirdArrName];
+
+        console.log(numbers);
+        best_number.push(numbers);
         array_index++;
       });
   } else {
@@ -151,8 +167,9 @@ function runningFunc(array_list, int) {
     clearInterval(int);
     let message = {
       message: `Finding RSI is completed... ${array_list.length} records are calculated. 
-      Test #: ${MAX.test_num + 1}
-      Market Rate: ${MAX.market.toFixed(2)}% 
+      Test #: ${MAX.test_num}, 
+      ${firstArrName}: ${MAX[firstArrName]}, ${secondArrName}: ${MAX[secondArrName]}, ${thirdArrName}: ${MAX[thirdArrName]},
+      Market Rate: ${MAX.market.toFixed(2)}%, 
       Bot Rate: ${MAX.gain.toFixed(2)}%`,
       title: "Found RSI",
       sound: 'cosmic',
@@ -167,5 +184,5 @@ function runningFunc(array_list, int) {
 }
 
 let int = setInterval(() => {
-  runningFunc(returnArr(unchanged), int)
+  runningFunc(returnArr(unchanged, loopArr), int)
 }, 2000);
