@@ -8,10 +8,13 @@ const p = new Pushover({
 
 let array_index = 0;
 let best_number = [];
-let loopArr = [['low', 10, 35], ['high', 65, 90], ['interval', 7, 21]];
+let loopArr = [['low', 15, 35], ['high', 65, 85], ['interval', 7, 15]];
 let unchanged = {
   candleSize: 5,
   historySize: 10,
+  method: 'RSI',
+  fromDate: '2017-09-05T00:00:00Z',
+  toDate: '2017-09-30T00:00:00Z'
 };
 let firstArrName = loopArr[0][0];
 let secondArrName = loopArr[1][0];
@@ -66,8 +69,8 @@ function createStragegy(params) {
       },
       backtest: {
         daterange: {
-          from: params.fromDate || '2017-09-25T00:00:00Z',
-          to: params.toDate || '2017-10-01T00:00:00Z',
+          from: params.fromDate,
+          to: params.toDate,
         },
         batchSize: 50
       },
@@ -75,7 +78,7 @@ function createStragegy(params) {
 
       'tradingAdvisor': {
         enabled: true,
-        method: 'RSI',
+        method: params.method,
         candleSize: params.candleSize,
         historySize: params.historySize,
       },
@@ -96,7 +99,7 @@ function createStragegy(params) {
     }
   };
 
-  obj.gekkoConfig['RSI'] = {
+  obj.gekkoConfig[params.method] = {
     /*RSI*/interval: params.interval,
     thresholds: {
       /*RSI*/low: params.low,
@@ -185,4 +188,4 @@ function runningFunc(array_list, int) {
 
 let int = setInterval(() => {
   runningFunc(returnArr(unchanged, loopArr), int)
-}, 2000);
+}, 3000);
