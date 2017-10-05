@@ -7,6 +7,7 @@ const p = new Pushover({
   user: 'us7CARhU1Rw6WXpLEYy2aLjAiaTkCH',
   token: 'aufx54z8fxrkchnkqgj2whv1sed7if',
 });
+const ProgressBar = require('progress');
 
 let array_index = 0;
 let best_number = [];
@@ -130,6 +131,14 @@ function returnArr(unchanged, loopArr) {
 }
 
 fs.writeFile('testresult.txt', '');
+const ARRR = returnArr(unchanged, loopArr);
+
+let bar = new ProgressBar('(:current/:total) | :bar | Elapsed: :elapsed sec | ETA: :eta sec', {
+  complete: '=',
+  incomplete: ' ',
+  width: 40,
+  total: ARRR.length
+});
 
 async function runningFunc(array_list) {
   for (let array of array_list) {
@@ -154,8 +163,9 @@ async function runningFunc(array_list) {
 
     best_number.push(numbers);
     array_index++;
-    if (array_list.length === array_index) {
-      let MAX = best_number.reduce(function (prev, curr) {
+    bar.tick();
+    if (bar.complete) {
+      let MAX = best_number.reduce((prev, curr) => {
         return prev.gain > curr.gain ? prev : curr;
       });
       let message = {
@@ -168,6 +178,7 @@ async function runningFunc(array_list) {
         sound: 'cosmic',
         device: 'pliu'
       };
+      console.log('\ncomplete\n');
       p.send(message, err => {
         if (err) {
           console.log(err)
@@ -176,4 +187,4 @@ async function runningFunc(array_list) {
     }
   }
 }
-runningFunc(returnArr(unchanged, loopArr));
+runningFunc(ARRR);
