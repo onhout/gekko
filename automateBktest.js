@@ -1,6 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const Pushover = require("pushover-notifications");
+const request = require('request');
+const rp = require('request-promise');
 const p = new Pushover({
   user: 'us7CARhU1Rw6WXpLEYy2aLjAiaTkCH',
   token: 'aufx54z8fxrkchnkqgj2whv1sed7if',
@@ -8,12 +10,12 @@ const p = new Pushover({
 
 let array_index = 0;
 let best_number = [];
-let loopArr = [['low', 15, 35], ['high', 65, 85], ['interval', 7, 15]];
+let loopArr = [['low', 15, 35], ['high', 65, 85], ['interval', 7, 21]];
 let unchanged = {
   candleSize: 5,
   historySize: 10,
   method: 'RSI',
-  fromDate: '2017-09-05T00:00:00Z',
+  fromDate: '2017-07-05T00:00:00Z',
   toDate: '2017-09-30T00:00:00Z'
 };
 let firstArrName = loopArr[0][0];
@@ -21,25 +23,17 @@ let secondArrName = loopArr[1][0];
 let thirdArrName = loopArr[2][0];
 
 
-function callBacktestApi(strategiConfig, callback) {
-  let body = JSON.stringify(strategiConfig);
+async function callBacktestApi(strategiConfig) {
   let options = {
-    host: '192.168.50.39',
-    port: 3000,
-    path: '/api/backtest',
+    uri: 'http://192.168.50.39:3000/api/backtest',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(body)
-    }
+    },
+    body: strategiConfig,
+    json: true,
   };
-  const postRequest = http.request(options, (response) => {
-    let str = '';
-    response.on('data', chunk => str += chunk);
-    response.on('end', () => callback(JSON.parse(str)));
-  });
-  postRequest.write(body);
-  postRequest.end();
+  return await rp(options)
 }
 
 function createStragegy(params) {
@@ -137,55 +131,49 @@ function returnArr(unchanged, loopArr) {
 
 fs.writeFile('testresult.txt', '');
 
-function runningFunc(array_list, int) {
-  if (array_list.length > array_index) {
+async function runningFunc(array_list) {
+  for (let array of array_list) {
     fs.appendFileSync('testresult.txt', `TEST#${array_index + 1}
-    CandleSize: ${array_list[array_index].gekkoConfig.tradingAdvisor.candleSize}
-    HistorySize: ${array_list[array_index].gekkoConfig.tradingAdvisor.historySize}
-    ${firstArrName}: ${array_list[array_index]['algoInfo'][firstArrName]} 
-    ${secondArrName}: ${array_list[array_index]['algoInfo'][secondArrName]}
-    ${thirdArrName}: ${array_list[array_index]['algoInfo'][thirdArrName]}\n`);
+    CandleSize: ${array.gekkoConfig.tradingAdvisor.candleSize}
+    HistorySize: ${array.gekkoConfig.tradingAdvisor.historySize}
+    ${firstArrName}: ${array['algoInfo'][firstArrName]}
+    ${secondArrName}: ${array['algoInfo'][secondArrName]}
+    ${thirdArrName}: ${array['algoInfo'][thirdArrName]}\n`);
 
-    callBacktestApi(array_list[array_index],
-      (result) => {
-        fs.appendFileSync('testresult.txt', `Trades: ${result.trades.length} | Market: ${result.report.market.toFixed(2)}% | Bot: ${result.report.relativeProfit.toFixed(2)}% | Balance: ${result.report.balance} \n\n`);
-        let numbers = {
-          'test_num': array_index + 1,
-          'trades': result.trades.length,
-          'market': result.report.market,
-          'gain': result.report.relativeProfit,
-        };
-        numbers[firstArrName] = array_list[array_index]['algoInfo'][firstArrName];
-        numbers[secondArrName] = array_list[array_index]['algoInfo'][secondArrName];
-        numbers[thirdArrName] = array_list[array_index]['algoInfo'][thirdArrName];
-
-        console.log(numbers);
-        best_number.push(numbers);
-        array_index++;
-      });
-  } else {
-    let MAX = best_number.reduce(function (prev, curr) {
-      return prev.gain > curr.gain ? prev : curr;
-    });
-    clearInterval(int);
-    let message = {
-      message: `Finding RSI is completed... ${array_list.length} records are calculated. 
-      Test #: ${MAX.test_num}, 
-      ${firstArrName}: ${MAX[firstArrName]}, ${secondArrName}: ${MAX[secondArrName]}, ${thirdArrName}: ${MAX[thirdArrName]},
-      Market Rate: ${MAX.market.toFixed(2)}%, 
-      Bot Rate: ${MAX.gain.toFixed(2)}%`,
-      title: "Found RSI",
-      sound: 'cosmic',
-      device: 'pliu'
+    const result = await callBacktestApi(array);
+    fs.appendFileSync('testresult.txt', `Trades: ${result.trades.length} | Market: ${result.report.market.toFixed(2)}% | Bot: ${result.report.relativeProfit.toFixed(2)}% | Balance: ${result.report.balance} \n\n`);
+    let numbers = {
+      'test_num': array_index + 1,
+      'trades': result.trades.length,
+      'market': result.report.market,
+      'gain': result.report.relativeProfit,
     };
-    p.send(message, err => {
-      if (err) {
-        console.log(err)
-      }
-    });
+    numbers[firstArrName] = array['algoInfo'][firstArrName];
+    numbers[secondArrName] = array['algoInfo'][secondArrName];
+    numbers[thirdArrName] = array['algoInfo'][thirdArrName];
+
+    best_number.push(numbers);
+    array_index++;
+    if (array_list.length === array_index) {
+      let MAX = best_number.reduce(function (prev, curr) {
+        return prev.gain > curr.gain ? prev : curr;
+      });
+      let message = {
+        message: `Finding RSI is completed... ${array_list.length} records are calculated.
+            Test #: ${MAX.test_num},
+            ${firstArrName}: ${MAX[firstArrName]}, ${secondArrName}: ${MAX[secondArrName]}, ${thirdArrName}: ${MAX[thirdArrName]},
+            Market Rate: ${MAX.market.toFixed(2)}%,
+            Bot Rate: ${MAX.gain.toFixed(2)}%`,
+        title: "Found RSI",
+        sound: 'cosmic',
+        device: 'pliu'
+      };
+      p.send(message, err => {
+        if (err) {
+          console.log(err)
+        }
+      });
+    }
   }
 }
-
-let int = setInterval(() => {
-  runningFunc(returnArr(unchanged, loopArr), int)
-}, 3000);
+runningFunc(returnArr(unchanged, loopArr));
