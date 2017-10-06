@@ -11,12 +11,12 @@ const ProgressBar = require('progress');
 
 let array_index = 0;
 let best_number = [];
-let loopArr = [['low', 15, 35], ['high', 65, 85], ['interval', 7, 21]];
+let loopArr = [['low', 15, 35], ['high', 65, 85], ['interval', 5, 15]];
 let unchanged = {
   candleSize: 5,
   historySize: 10,
   method: 'RSI',
-  fromDate: '2017-07-05T00:00:00Z',
+  fromDate: '2017-09-23T00:00:00Z',
   toDate: '2017-09-30T00:00:00Z'
 };
 let firstArrName = loopArr[0][0];
@@ -53,7 +53,7 @@ function createStragegy(params) {
         simulationBalance: {
           // these are in the unit types configured in the watcher.
           asset: 1,
-          currency: 100,
+          currency: 1,
         },
         // how much fee in % does each trade cost?
         feeMaker: 0.15,
@@ -133,7 +133,7 @@ function returnArr(unchanged, loopArr) {
 fs.writeFile('testresult.txt', '');
 const ARRR = returnArr(unchanged, loopArr);
 
-let bar = new ProgressBar('(:current/:total) | :bar | Elapsed: :elapsed sec | ETA: :eta sec', {
+let bar = new ProgressBar('(:current/:total) | :bar | Elapsed: :elapseds | ETA: :etas', {
   complete: '=',
   incomplete: ' ',
   width: 40,
@@ -150,12 +150,14 @@ async function runningFunc(array_list) {
     ${thirdArrName}: ${array['algoInfo'][thirdArrName]}\n`);
 
     const result = await callBacktestApi(array);
-    fs.appendFileSync('testresult.txt', `Trades: ${result.trades.length} | Market: ${result.report.market.toFixed(2)}% | Bot: ${result.report.relativeProfit.toFixed(2)}% | Balance: ${result.report.balance} \n\n`);
+    fs.appendFileSync('testresult.txt',
+      `Trades: ${result.trades.length} | Market: ${result.report.market.toFixed(2)}% | Bot: ${result.report.relativeProfit.toFixed(2)}% | Sharpe: ${result.report.sharpe} \n\n`);
     let numbers = {
       'test_num': array_index + 1,
       'trades': result.trades.length,
       'market': result.report.market,
       'gain': result.report.relativeProfit,
+      'sharpe': result.report.sharpe,
     };
     numbers[firstArrName] = array['algoInfo'][firstArrName];
     numbers[secondArrName] = array['algoInfo'][secondArrName];
