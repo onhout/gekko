@@ -133,10 +133,10 @@ function returnArr(unchanged, loopArr) {
 fs.writeFile('testresult.txt', '');
 const ARRR = returnArr(unchanged, loopArr);
 
-let bar = new ProgressBar('(:current/:total) | :bar | Elapsed: :elapseds | ETA: :etas', {
+let bar = new ProgressBar('(:current/:total) |:bar| Elapsed: :elapseds | ETA: :etas', {
   complete: '=',
   incomplete: ' ',
-  width: 40,
+  width: 30,
   total: ARRR.length
 });
 
