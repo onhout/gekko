@@ -16,8 +16,10 @@ let unchanged = {
   candleSize: 5,
   historySize: 10,
   method: 'RSI',
-  fromDate: '2017-09-23T00:00:00Z',
-  toDate: '2017-09-30T00:00:00Z'
+  currency: 'BTC',
+  asset: 'ETH',
+  fromDate: '2017-10-01T00:00:00Z',
+  toDate: '2017-10-11T00:00:00Z'
 };
 let firstArrName = loopArr[0][0];
 let secondArrName = loopArr[1][0];
@@ -42,8 +44,8 @@ function createStragegy(params) {
     gekkoConfig: {
       watch: {
         exchange: params.exchange || 'poloniex',
-        currency: params.currency || 'BTC',
-        asset: params.asset || 'ETH',
+        currency: params.currency,
+        asset: params.asset,
       },
       paperTrader: {
         enabled: true,
