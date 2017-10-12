@@ -18,12 +18,21 @@ let unchanged = {
   method: 'RSI',
   currency: 'BTC',
   asset: 'ETH',
-  fromDate: '2017-10-01T00:00:00Z',
+  fromDate: '2017-09-11T00:00:00Z',
   toDate: '2017-10-11T00:00:00Z'
 };
 let firstArrName = loopArr[0][0];
 let secondArrName = loopArr[1][0];
 let thirdArrName = loopArr[2][0];
+
+const ARRR = returnArr(unchanged, loopArr);
+
+let bar = new ProgressBar('(:current/:total) |:bar| Elapsed: :elapseds | ETA: :etas', {
+  complete: '=',
+  incomplete: ' ',
+  width: 30,
+  total: ARRR.length
+});
 
 
 async function callBacktestApi(strategiConfig) {
@@ -40,7 +49,7 @@ async function callBacktestApi(strategiConfig) {
 }
 
 function createStragegy(params) {
-  let obj = {
+  return {
     gekkoConfig: {
       watch: {
         exchange: params.exchange || 'poloniex',
@@ -82,6 +91,16 @@ function createStragegy(params) {
       performanceAnalyzer: {
         enabled: true,
         riskFreeReturn: 5
+      },
+      [params.method]: {
+        /*RSI*/interval: params.interval,
+        thresholds: {
+          /*RSI*/low: params.low,
+          /*RSI*/high: params.high,
+          // How many candle intervals should a trend persist
+          // before we consider it real?
+          /*RSI*/persistence: 2
+        }
       }
     },
     data: {
@@ -93,25 +112,13 @@ function createStragegy(params) {
       report: true,
       roundtrips: true,
       trades: true
+    },
+    algoInfo: {
+      [firstArrName]: params[firstArrName],
+      [secondArrName]: params[secondArrName],
+      [thirdArrName]: params[thirdArrName]
     }
   };
-
-  obj.gekkoConfig[params.method] = {
-    /*RSI*/interval: params.interval,
-    thresholds: {
-      /*RSI*/low: params.low,
-      /*RSI*/high: params.high,
-      // How many candle intervals should a trend persist
-      // before we consider it real?
-      /*RSI*/persistence: 2
-    }
-  };
-  obj.algoInfo = {};
-  obj['algoInfo'][firstArrName] = params[firstArrName];
-  obj['algoInfo'][secondArrName] = params[secondArrName];
-  obj['algoInfo'][thirdArrName] = params[thirdArrName];
-
-  return obj;
 }
 
 function returnArr(unchanged, loopArr) {
@@ -119,31 +126,23 @@ function returnArr(unchanged, loopArr) {
   for (let first = loopArr[0][1]; first <= loopArr[0][2]; first++) {
     for (let second = loopArr[1][1]; second <= loopArr[1][2]; second++) {
       for (let third = loopArr[2][1]; third <= loopArr[2][2]; third++) {
-        let dat = unchanged;
-        dat[firstArrName] = first;
-        dat[secondArrName] = second;
-        dat[thirdArrName] = third;
-
-        arr.push(createStragegy(dat));
+        let loopedData = {
+          [firstArrName]: first,
+          [secondArrName]: second,
+          [thirdArrName]: third,
+        };
+        arr.push(createStragegy({...unchanged, ...loopedData}));
       }
     }
   }
-
   return arr;
 }
 
 fs.writeFile('testresult.txt', '');
-const ARRR = returnArr(unchanged, loopArr);
 
-let bar = new ProgressBar('(:current/:total) |:bar| Elapsed: :elapseds | ETA: :etas', {
-  complete: '=',
-  incomplete: ' ',
-  width: 30,
-  total: ARRR.length
-});
 
-async function runningFunc(array_list) {
-  for (let array of array_list) {
+(async() => {
+  for (let array of ARRR) {
     fs.appendFileSync('testresult.txt', `TEST#${array_index + 1}
     CandleSize: ${array.gekkoConfig.tradingAdvisor.candleSize}
     HistorySize: ${array.gekkoConfig.tradingAdvisor.historySize}
@@ -151,21 +150,22 @@ async function runningFunc(array_list) {
     ${secondArrName}: ${array['algoInfo'][secondArrName]}
     ${thirdArrName}: ${array['algoInfo'][thirdArrName]}\n`);
 
-    const result = await callBacktestApi(array);
-    fs.appendFileSync('testresult.txt',
-      `Trades: ${result.trades.length} | Market: ${result.report.market.toFixed(2)}% | Bot: ${result.report.relativeProfit.toFixed(2)}% | Sharpe: ${result.report.sharpe} \n\n`);
-    let numbers = {
-      'test_num': array_index + 1,
-      'trades': result.trades.length,
-      'market': result.report.market,
-      'gain': result.report.relativeProfit,
-      'sharpe': result.report.sharpe,
-    };
-    numbers[firstArrName] = array['algoInfo'][firstArrName];
-    numbers[secondArrName] = array['algoInfo'][secondArrName];
-    numbers[thirdArrName] = array['algoInfo'][thirdArrName];
+    const {report:report, trades:trades} = await callBacktestApi(array);
 
-    best_number.push(numbers);
+    fs.appendFileSync('testresult.txt',
+      `Trades: ${trades.length} | Market: ${report.market.toFixed(2)}% | Bot: ${report.relativeProfit.toFixed(2)}% | Sharpe: ${report.sharpe} \n\n`);
+
+    best_number.push({
+      'test_num': array_index + 1,
+      'trades': trades.length,
+      'market': report.market,
+      'gain': report.relativeProfit,
+      'sharpe': report.sharpe,
+      [firstArrName]: array.algoInfo[firstArrName],
+      [secondArrName]: array.algoInfo[secondArrName],
+      [thirdArrName]: array.algoInfo[thirdArrName],
+    });
+
     array_index++;
     bar.tick();
     if (bar.complete) {
@@ -173,7 +173,7 @@ async function runningFunc(array_list) {
         return prev.gain > curr.gain ? prev : curr;
       });
       let message = {
-        message: `Finding RSI is completed... ${array_list.length} records are calculated.
+        message: `Finding RSI is completed... ${ARRR.length} records are calculated.
             Test #: ${MAX.test_num},
             ${firstArrName}: ${MAX[firstArrName]}, ${secondArrName}: ${MAX[secondArrName]}, ${thirdArrName}: ${MAX[thirdArrName]},
             Market Rate: ${MAX.market.toFixed(2)}%,
@@ -190,5 +190,4 @@ async function runningFunc(array_list) {
       });
     }
   }
-}
-runningFunc(ARRR);
+})();
